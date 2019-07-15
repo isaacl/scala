@@ -51,6 +51,8 @@ class ArrayDeque[A] protected (
 
   reset(array, start, end)
 
+  private[this] var mask: Int = array.length - 1
+
   private[this] def reset(array: Array[AnyRef], start: Int, end: Int) = {
     assert((array.length & (array.length - 1)) == 0, s"Array.length must be power of 2")
     requireBounds(idx = start, until = array.length)
@@ -58,6 +60,7 @@ class ArrayDeque[A] protected (
     this.array = array
     this.start = start
     this.end = end
+    this.mask = array.length - 1
   }
 
   def this(initialSize: Int = ArrayDeque.DefaultInitialSize) = this(ArrayDeque.alloc(initialSize), start = 0, end = 0)
@@ -479,27 +482,27 @@ class ArrayDeque[A] protected (
   def trimToSize(): Unit = resize(length)
 
   // Utils for common modular arithmetic:
-  @inline protected def start_+(idx: Int) = (start + idx) & (array.length - 1)
-  @inline private[this] def start_-(idx: Int) = (start - idx) & (array.length - 1)
-  @inline private[this] def end_+(idx: Int) = (end + idx) & (array.length - 1)
-  @inline private[this] def end_-(idx: Int) = (end - idx) & (array.length - 1)
+  @inline protected def start_+(idx: Int) = (start + idx) & mask
+  @inline private[this] def start_-(idx: Int) = (start - idx) & mask
+  @inline private[this] def end_+(idx: Int) = (end + idx) & mask
+  @inline private[this] def end_-(idx: Int) = (end - idx) & mask
 
   // Note: here be overflow dragons! This is used for int overflow
   // assumptions in resize(). Use caution changing.
   @inline private[this] def mustGrow(len: Int) = {
-    len >= array.length
+    len > mask
   }
 
-  // Assumes that 0 <= len < array.length!
+  // Assumes that 0 <= len <= mask!
   @inline private[this] def shouldShrink(len: Int) = {
     // To avoid allocation churn, only shrink when array is large
     // and less than 2/5 filled.
-    array.length > ArrayDeque.StableSize && array.length - len - (len >> 1) > len
+    mask > ArrayDeque.StableSize && mask - len - (len >> 1) >= len
   }
 
-  // Assumes that 0 <= len < array.length!
+  // Assumes that 0 <= len <= mask!
   @inline private[this] def canShrink(len: Int) = {
-    array.length > ArrayDeque.DefaultInitialSize && array.length - len > len
+    mask > ArrayDeque.DefaultInitialSize && mask > 2*len
   }
 
   @inline private[this] def _get(idx: Int): A = array(start_+(idx)).asInstanceOf[A]
